@@ -1,0 +1,26 @@
+# Byte-compiled / optimized files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+.env
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# IDE / tooling
+.vscode/
+.idea/
+.DS_Store
+
+# Project outputs and caches
+output/
+output/.matplotlib_cache/
+.ipynb_checkpoints/
+
