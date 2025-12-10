@@ -71,16 +71,16 @@ Charts are saved to `output/` directory:
 ## Sample Visualizations
 
 ### Stress Score Time Series
-![Stress Time Series](output/example_stress_timeseries.png)
+![Stress Time Series](assets/sample_charts/stress_timeseries.png)
 
 ### Component Breakdown
-![Component Breakdown](output/example_component_breakdown.png)
+![Component Breakdown](assets/sample_charts/component_breakdown.png)
 
 ### Correlation Heatmap
-![Correlation Heatmap](output/example_correlation_heatmap.png)
+![Correlation Heatmap](assets/sample_charts/correlation_heatmap.png)
 
 ### Alert Timeline
-![Alert Timeline](output/example_alert_timeline.png)
+![Alert Timeline](assets/sample_charts/alert_timeline.png)
 
 ## Project Structure
 
