@@ -1,0 +1,10 @@
+{
+  "projectId": "singapore-economic-stress-monitor",
+  "stressScore": 55.7,
+  "stressBand": "Elevated",
+  "oneMonthChange": -3.5,
+  "threeMonthChange": -0.1,
+  "lastUpdated": "2026-02-14T08:35:26Z",
+  "githubUrl": "",
+  "summary": "A composite indicator tracking financial stress in Singapore's economy using publicly available macroeconomic data."
+}

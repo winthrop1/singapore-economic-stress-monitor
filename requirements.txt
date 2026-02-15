@@ -13,3 +13,7 @@ requests>=2.28.0
 
 # Date handling (included with pandas but listed for clarity)
 python-dateutil>=2.8.0
+
+# API serving
+fastapi>=0.115.0
+uvicorn>=0.30.0

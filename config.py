@@ -19,6 +19,11 @@ import os
 # Base directory of the project
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+# Project metadata (env-overridable for deployment)
+PROJECT_ID = os.getenv('PROJECT_ID', 'singapore-economic-stress-monitor')
+PROJECT_NAME = os.getenv('PROJECT_NAME', 'Singapore Economic Stress Monitor')
+PROJECT_REPOSITORY_URL = os.getenv('PROJECT_REPOSITORY_URL', '')
+
 # Data directories
 DATA_DIR = os.path.join(BASE_DIR, 'data')
 OUTPUT_DIR = os.path.join(BASE_DIR, 'output')
@@ -28,6 +33,39 @@ DATA_FILES = {
     'gdp': os.path.join(DATA_DIR, 'gdp_clean.csv'),
     'cpi': os.path.join(DATA_DIR, 'cpi_clean.csv'),
     'unemployment': os.path.join(DATA_DIR, 'unemployment_clean.csv'),
+}
+
+SOURCE_METADATA = {
+    'gdp': {
+        'name': os.getenv(
+            'SOURCE_GDP_NAME',
+            'Department of Statistics Singapore (GDP)'
+        ),
+        'url': os.getenv(
+            'SOURCE_GDP_URL',
+            'https://www.singstat.gov.sg/find-data/search-by-theme/economy/national-accounts/latest-data'
+        ),
+    },
+    'cpi': {
+        'name': os.getenv(
+            'SOURCE_CPI_NAME',
+            'Department of Statistics Singapore (CPI)'
+        ),
+        'url': os.getenv(
+            'SOURCE_CPI_URL',
+            'https://www.singstat.gov.sg/find-data/search-by-theme/economy/prices-and-price-indices/latest-data'
+        ),
+    },
+    'unemployment': {
+        'name': os.getenv(
+            'SOURCE_UNEMPLOYMENT_NAME',
+            'Ministry of Manpower / SingStat (Unemployment)'
+        ),
+        'url': os.getenv(
+            'SOURCE_UNEMPLOYMENT_URL',
+            'https://stats.mom.gov.sg/Pages/Unemployment-Summary-Table.aspx'
+        ),
+    },
 }
 
 # =============================================================================

@@ -31,7 +31,6 @@ import config
 from src.data_loader import load_all_data, get_summary_stats
 from src.normalizer import normalize_all_indicators, get_normalization_summary
 from src.stress_scorer import calculate_composite_score, get_stress_summary
-from src.visualizer import create_all_charts
 
 
 def print_header(title: str, width: int = 60):
@@ -170,6 +169,7 @@ def run_dashboard(create_charts: bool = True, verbose: bool = True):
         # =====================================================================
         chart_paths = None
         if create_charts:
+            from src.visualizer import create_all_charts
             chart_paths = create_all_charts(stress_df, normalized)
 
             if verbose:

@@ -8,6 +8,8 @@ __pycache__/
 venv/
 env/
 .env
+.env.*
+!.env.example
 
 # Distribution / packaging
 build/
@@ -18,9 +20,9 @@ dist/
 .vscode/
 .idea/
 .DS_Store
+*.code-workspace
 
 # Project outputs and caches
 output/
 output/.matplotlib_cache/
 .ipynb_checkpoints/
-

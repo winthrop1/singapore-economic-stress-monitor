@@ -60,9 +60,20 @@ python main.py
 python main.py --quiet --no-charts
 ```
 
-### 4. View Results
+### 4. Export Frontend Payloads
 
-Charts are saved to `output/` directory:
+```bash
+# Generate latest.json/history.json/indicators.json for frontend and API
+python export_frontend_data.py --quiet
+```
+
+### 5. View Results
+
+Charts are saved to `output/` directory, and frontend payloads to:
+- `frontend/public/projects/singapore-economic-stress-monitor/data/`
+- `output/dashboard_data/`
+
+Charts:
 - `stress_timeseries.png` - Historical stress score with threshold bands
 - `component_breakdown.png` - Weighted contributions by indicator
 - `correlation_heatmap.png` - Indicator correlation matrix
@@ -92,12 +103,18 @@ singapore-economic-stress-monitor/
 │   └── unemployment_clean.csv # Unemployment rate (quarterly → monthly)
 ├── src/                       # Core modules
 │   ├── data_loader.py         # Load and align CSV data
+│   ├── frontend_data.py       # Build frontend/API JSON payloads
 │   ├── normalizer.py          # Z-score normalization
 │   ├── stress_scorer.py       # Weighted composite scoring
 │   └── visualizer.py          # Chart generation
+├── frontend/                  # React/Vite project showcase page
+│   └── public/projects/...    # Static JSON payloads for web UI
+├── .github/workflows/         # Automated data refresh workflow
+├── api_server.py              # FastAPI read-only backend endpoints
 ├── output/                    # Generated charts
 ├── fetch_singstat_api.py      # Data fetcher from SingStat
 ├── transform_data.py          # Data transformation script
+├── export_frontend_data.py    # Export backend results to frontend JSON
 ├── main.py                    # Main orchestration script
 ├── config.py                  # Configuration (weights, thresholds)
 ├── README.md                  # This file
@@ -161,6 +178,31 @@ Composite Score = (0.35 × GDP_score) + (0.35 × CPI_score) + (0.30 × Unemploym
 - Transform wide-format API data to clean CSV
 - Handle quarterly → monthly resampling (forward-fill)
 - Align all indicators to common date range
+- Export frontend/API payloads from backend computations
+- Scheduled GitHub Actions refresh and commit updated payloads
+
+## Frontend + API Integration
+
+### Frontend Data Flow
+- Frontend tries backend API first when `VITE_API_BASE_URL` is set
+- On API failure, frontend falls back to static JSON payloads in `frontend/public/.../data`
+
+### Backend API Endpoints (Read-only)
+- `GET /healthz`
+- `GET /api/stress-monitor/latest`
+- `GET /api/stress-monitor/history`
+- `GET /api/stress-monitor/indicators`
+
+Run locally:
+```bash
+uvicorn api_server:app --host 0.0.0.0 --port 8000
+```
+
+Security controls included:
+- CORS allowlist via `CORS_ALLOWED_ORIGINS`
+- GET-only API surface (read-only)
+- Security headers (`nosniff`, `DENY`, referrer policy)
+- Project metadata and repository URL supplied via env (`PROJECT_ID`, `PROJECT_NAME`, `PROJECT_REPOSITORY_URL`)
 
 ### Professional Visualizations
 - Time series with threshold bands
@@ -209,7 +251,7 @@ SIGMOID_STEEPNESS = 1.0
 2. **Quarterly data resampled to monthly** using forward-fill (not interpolation)
 3. **First 36 months have incomplete z-scores** (window build-up period)
 4. **No real-time data** (shows most recent published data only)
-5. **Manual refresh required** (must re-run fetch script for updates)
+5. **Data.gov.sg API schema may change** (fetch script may need maintenance)
 
 ## Requirements
 

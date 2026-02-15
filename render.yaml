@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: singapore-stress-monitor-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api_server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: STRESS_API_CACHE_TTL_SECONDS
+        value: "600"

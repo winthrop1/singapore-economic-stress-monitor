@@ -1,0 +1,41 @@
+{
+  "projectId": "singapore-economic-stress-monitor",
+  "drivers": [
+    {
+      "name": "GDP Growth",
+      "contribution": -7.9,
+      "direction": "positive"
+    },
+    {
+      "name": "Consumer Price Inflation",
+      "contribution": -2.8,
+      "direction": "positive"
+    },
+    {
+      "name": "Unemployment Rate",
+      "contribution": 0.9,
+      "direction": "negative"
+    }
+  ],
+  "methodology": {
+    "summary": "The Singapore Economic Stress Monitor combines normalized GDP, CPI, and unemployment indicators into a composite 0-100 stress score. Higher values indicate higher macroeconomic stress.",
+    "details": "1) Load indicator data and align to monthly frequency.\n2) Normalize each indicator to a 0-100 stress scale with rolling z-scores and sigmoid mapping.\n3) Combine normalized indicators using configured weights:\n   - GDP: 35%\n   - CPI: 35%\n   - Unemployment: 30%\n4) Classify stress bands from composite score:\n   - Low: 0-25\n   - Moderate: 26-50\n   - Elevated: 51-75\n   - High: 76-100"
+  },
+  "sources": [
+    {
+      "name": "Department of Statistics Singapore (GDP)",
+      "url": "https://www.singstat.gov.sg/find-data/search-by-theme/economy/national-accounts/latest-data",
+      "lastUpdated": "2025-04-01"
+    },
+    {
+      "name": "Department of Statistics Singapore (CPI)",
+      "url": "https://www.singstat.gov.sg/find-data/search-by-theme/economy/prices-and-price-indices/latest-data",
+      "lastUpdated": "2025-10-01"
+    },
+    {
+      "name": "Ministry of Manpower / SingStat (Unemployment)",
+      "url": "https://stats.mom.gov.sg/Pages/Unemployment-Summary-Table.aspx",
+      "lastUpdated": "2025-07-01"
+    }
+  ]
+}
