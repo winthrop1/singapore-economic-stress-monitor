@@ -1,250 +1,140 @@
 """
 Data.gov.sg API Fetcher for SingStat Economic Indicators
-Fetches unemployment, CPI, GDP, and wage data via API
+Fetches unemployment, CPI, and GDP data via the v1 API.
 """
 
+import sys
 import requests
 import pandas as pd
-import json
-from typing import Optional, Dict, Any
+from io import StringIO
+from typing import Optional, Dict
 import time
 
-# Dataset IDs from data.gov.sg
-DATASETS = {
+# Correct v1 API base (api-open, not api-production)
+_API_BASE = "https://api-open.data.gov.sg/v1/public/api/datasets"
+
+# Required datasets — pipeline fails if any of these can't be fetched
+REQUIRED_DATASETS = {
     "unemployment": {
         "id": "d_b816a930bca0eb19fdf20fcbfcdd4c39",
         "name": "Unemployment Rate (Quarterly, Seasonally Adjusted)",
-        "file": "unemployment.csv"
+        "file": "unemployment.csv",
     },
     "cpi": {
         "id": "d_bdaff844e3ef89d39fceb962ff8f0791",
         "name": "Consumer Price Index (2024 Base Year, Monthly)",
-        "file": "cpi.csv"
+        "file": "cpi.csv",
     },
     "gdp": {
         "id": "d_a5ff719648a0e6d4b4c623ee383ab686",
         "name": "GDP Year-on-Year Growth Rate (Quarterly)",
-        "file": "gdp.csv"
+        "file": "gdp.csv",
     },
-    "wage": {
-        "id": "d_7f59ea6dc7b3dbecb828f64935537df6",  # Basic wage change dataset
-        "name": "Basic Wage Change (Quarterly)",
-        "file": "wage.csv"
-    }
 }
 
-# API endpoint patterns to try
-API_ENDPOINTS = [
-    # Pattern 1: New v2 API
-    "https://api-production.data.gov.sg/v2/public/api/datasets/{dataset_id}/poll-download",
-    # Pattern 2: Direct download
-    "https://data.gov.sg/api/action/datastore_search?resource_id={dataset_id}&limit=10000",
-    # Pattern 3: CKAN-style
-    "https://data.gov.sg/dataset/{dataset_id}/download",
-    # Pattern 4: Beta API
-    "https://beta.data.gov.sg/api/3/action/datastore_search?resource_id={dataset_id}&limit=10000",
-    # Pattern 5: v1 initiate download
-    "https://api-open.data.gov.sg/v1/public/api/datasets/{dataset_id}/initiate-download",
-    # Pattern 6: v2 initiate download
-    "https://api-production.data.gov.sg/v2/public/api/datasets/{dataset_id}/initiate-download",
-]
+# Optional datasets — pipeline continues even if these fail
+OPTIONAL_DATASETS: Dict = {}
 
 
-def fetch_with_endpoint(dataset_id: str, endpoint_pattern: str) -> Optional[Dict]:
-    """Try fetching data with a specific endpoint pattern"""
-    url = endpoint_pattern.format(dataset_id=dataset_id)
-
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-        'Accept': 'application/json',
-    }
-
-    try:
-        response = requests.get(url, headers=headers, timeout=30)
-
-        if response.status_code == 200:
-            # Check if JSON response
-            try:
-                data = response.json()
-                return {"success": True, "data": data, "url": url}
-            except:
-                # Might be CSV data
-                if response.text.strip():
-                    return {"success": True, "data": response.text, "url": url, "type": "csv"}
-
-        return {"success": False, "status": response.status_code, "url": url}
-
-    except Exception as e:
-        return {"success": False, "error": str(e), "url": url}
-
-
-def initiate_download(dataset_id: str) -> Optional[str]:
+def _download_dataset(dataset_id: str) -> Optional[pd.DataFrame]:
     """
-    Use the initiate-download endpoint which returns a download URL
-    This is the recommended approach for data.gov.sg
+    Download a dataset using the data.gov.sg v1 two-step API:
+    1. GET initiate-download  → starts the export job
+    2. GET poll-download       → repeat until the CSV URL is ready
     """
-    # Try v2 API first
-    url = f"https://api-production.data.gov.sg/v2/public/api/datasets/{dataset_id}/initiate-download"
+    headers = {"Accept": "application/json"}
 
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-        'Accept': 'application/json',
-    }
+    # Step 1: initiate
+    initiate_url = f"{_API_BASE}/{dataset_id}/initiate-download"
+    print(f"  Initiating: {initiate_url}")
+    resp = requests.get(initiate_url, headers=headers, timeout=30)
+    print(f"  Status: {resp.status_code}")
 
-    print(f"  Initiating download from: {url}")
-
-    try:
-        response = requests.get(url, headers=headers, timeout=30)
-        print(f"  Status: {response.status_code}")
-
-        if response.status_code == 200:
-            data = response.json()
-            print(f"  Response: {json.dumps(data, indent=2)[:500]}")
-
-            # The response should contain a download URL
-            if "data" in data and "url" in data["data"]:
-                return data["data"]["url"]
-            elif "url" in data:
-                return data["url"]
-            elif "download_url" in data:
-                return data["download_url"]
-            else:
-                print(f"  Unexpected response structure: {list(data.keys())}")
-                return None
-        else:
-            print(f"  Failed: {response.text[:300]}")
-            return None
-
-    except Exception as e:
-        print(f"  Error: {str(e)}")
+    if resp.status_code != 200:
+        print(f"  Failed: {resp.text[:300]}")
         return None
 
-
-def download_csv(url: str) -> Optional[pd.DataFrame]:
-    """Download CSV from the provided URL"""
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-    }
-
-    try:
-        response = requests.get(url, headers=headers, timeout=60)
-
-        if response.status_code == 200:
-            # Parse CSV from response
-            from io import StringIO
-            df = pd.read_csv(StringIO(response.text))
-            return df
-        else:
-            print(f"  Download failed: {response.status_code}")
+    # Step 2: poll until URL is available (up to ~60 s)
+    poll_url = f"{_API_BASE}/{dataset_id}/poll-download"
+    for attempt in range(12):
+        time.sleep(5)
+        resp = requests.get(poll_url, headers=headers, timeout=30)
+        if resp.status_code != 200:
+            print(f"  Poll {attempt + 1} failed: {resp.status_code} — retrying")
+            continue
+        body = resp.json()
+        inner = body.get("data", body)
+        csv_url = inner.get("url", "")
+        status = inner.get("status", "")
+        print(f"  Poll {attempt + 1}: status={status or '?'}")
+        if csv_url:
+            csv_resp = requests.get(csv_url, timeout=60)
+            if csv_resp.status_code == 200:
+                return pd.read_csv(StringIO(csv_resp.text))
+            print(f"  CSV download failed: {csv_resp.status_code}")
             return None
 
-    except Exception as e:
-        print(f"  Download error: {str(e)}")
-        return None
-
-
-def fetch_dataset(indicator: str, config: Dict) -> Optional[pd.DataFrame]:
-    """Fetch a single dataset using the data.gov.sg API"""
-
-    print(f"\n{'='*70}")
-    print(f"Fetching: {config['name']}")
-    print(f"Dataset ID: {config['id']}")
-    print(f"{'='*70}")
-
-    # Method 1: Try initiate-download endpoint
-    print("\nMethod 1: Initiate Download API")
-    download_url = initiate_download(config['id'])
-
-    if download_url:
-        print(f"  Got download URL: {download_url[:80]}...")
-        df = download_csv(download_url)
-        if df is not None:
-            print(f"  ✓ Success! Downloaded {len(df)} rows")
-            return df
-
-    # Method 2: Try other endpoint patterns
-    print("\nMethod 2: Trying alternative endpoints...")
-    for i, pattern in enumerate(API_ENDPOINTS, 1):
-        print(f"  Attempt {i}: {pattern[:50]}...")
-        result = fetch_with_endpoint(config['id'], pattern)
-
-        if result.get("success"):
-            print(f"  ✓ Got response from: {result['url']}")
-
-            if result.get("type") == "csv":
-                from io import StringIO
-                df = pd.read_csv(StringIO(result["data"]))
-                return df
-            elif isinstance(result.get("data"), dict):
-                # Parse JSON response
-                if "result" in result["data"] and "records" in result["data"]["result"]:
-                    df = pd.DataFrame(result["data"]["result"]["records"])
-                    return df
-
-        time.sleep(0.5)  # Rate limiting
-
-    print(f"\n✗ Failed to fetch {indicator}")
+    print("  No download URL obtained after polling")
     return None
 
 
-def main():
-    """Main function to fetch all datasets"""
+def _fetch_and_save(indicator: str, cfg: Dict) -> Optional[pd.DataFrame]:
+    print(f"\n{'='*70}")
+    print(f"Fetching: {cfg['name']}")
+    print(f"Dataset ID: {cfg['id']}")
+    print(f"{'='*70}")
 
-    print("\n" + "="*70)
+    df = _download_dataset(cfg["id"])
+    if df is not None:
+        filepath = f"data/{cfg['file']}"
+        df.to_csv(filepath, index=False)
+        print(f"\n✓ Saved {len(df)} rows → {filepath}")
+        print(f"  Columns: {list(df.columns[:6])}{'...' if len(df.columns) > 6 else ''}")
+    else:
+        print(f"\n✗ Failed to fetch {indicator}")
+    return df
+
+
+def main():
+    print("\n" + "=" * 70)
     print("DATA.GOV.SG API FETCHER")
-    print("Fetching 4 SingStat Economic Indicators")
-    print("="*70)
+    print("=" * 70)
 
     results = {}
+    failed_required = []
 
-    for indicator, config in DATASETS.items():
-        df = fetch_dataset(indicator, config)
+    for indicator, cfg in REQUIRED_DATASETS.items():
+        df = _fetch_and_save(indicator, cfg)
+        results[indicator] = df
+        if df is None:
+            failed_required.append(indicator)
+        time.sleep(1)
 
-        if df is not None:
-            results[indicator] = df
-
-            # Save to CSV
-            filepath = f"data/{config['file']}"
-            df.to_csv(filepath, index=False)
-            print(f"\n✓ Saved to {filepath}")
-
-            # Show preview
-            print(f"\nPreview of {indicator}:")
-            print(f"Columns: {list(df.columns)}")
-            print(df.head(3).to_string())
-        else:
-            results[indicator] = None
-
-        time.sleep(1)  # Rate limiting between datasets
+    for indicator, cfg in OPTIONAL_DATASETS.items():
+        df = _fetch_and_save(indicator, cfg)
+        results[indicator] = df
+        if df is None:
+            print(f"  (optional — pipeline will continue without {indicator})")
+        time.sleep(1)
 
     # Summary
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("FETCH SUMMARY")
-    print("="*70)
-
-    success_count = sum(1 for v in results.values() if v is not None)
-    print(f"\nSuccessfully fetched: {success_count}/4 datasets")
-
+    print("=" * 70)
     for indicator, df in results.items():
+        tag = "(optional)" if indicator in OPTIONAL_DATASETS else "(required)"
         if df is not None:
-            print(f"  ✓ {indicator}: {len(df)} rows")
+            print(f"  ✓ {indicator} {tag}: {len(df)} rows")
         else:
-            print(f"  ✗ {indicator}: FAILED")
+            print(f"  ✗ {indicator} {tag}: FAILED")
 
-    if success_count < 4:
-        print("\n" + "="*70)
-        print("MANUAL DOWNLOAD REQUIRED")
-        print("="*70)
-        print("\nSome datasets couldn't be fetched via API.")
-        print("Please download manually from:")
-        for indicator, df in results.items():
-            if df is None:
-                config = DATASETS[indicator]
-                print(f"\n{indicator}:")
-                print(f"  https://data.gov.sg/datasets/{config['id']}/view")
+    if failed_required:
+        print(f"\nERROR: {len(failed_required)} required dataset(s) could not be fetched: {failed_required}")
+        print("Check dataset IDs at https://data.gov.sg and update REQUIRED_DATASETS.")
+        sys.exit(1)
 
     return results
 
 
 if __name__ == "__main__":
-    results = main()
+    main()

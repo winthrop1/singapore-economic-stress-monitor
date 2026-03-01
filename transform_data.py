@@ -3,6 +3,7 @@ Transform SingStat Data from Wide to Long Format
 Converts API data to standard date/value format for stress dashboard
 """
 
+import os
 import pandas as pd
 import re
 from typing import Optional
@@ -119,7 +120,7 @@ def transform_gdp(filepath: str = "data/gdp.csv") -> pd.DataFrame:
             value = target_row[col].values[0]
             try:
                 records.append({'date': date_str, 'value': float(value)})
-            except:
+            except (ValueError, TypeError):
                 pass
 
     result = pd.DataFrame(records)
@@ -161,7 +162,7 @@ def transform_cpi(filepath: str = "data/cpi.csv") -> pd.DataFrame:
             value = target_row[col].values[0]
             try:
                 records.append({'date': date_str, 'value': float(value)})
-            except:
+            except (ValueError, TypeError):
                 pass
 
     result = pd.DataFrame(records)
@@ -178,6 +179,10 @@ def transform_wage(filepath: str = "data/wage.csv") -> pd.DataFrame:
     print("\n" + "="*60)
     print("Transforming WAGE data")
     print("="*60)
+
+    if not os.path.exists(filepath):
+        print(f"  Skipping: {filepath} not found (dataset may be unavailable)")
+        return pd.DataFrame()
 
     df = pd.read_csv(filepath)
     print(f"Loaded {len(df)} rows, {len(df.columns)} columns")
@@ -224,7 +229,7 @@ def transform_wage(filepath: str = "data/wage.csv") -> pd.DataFrame:
             value = target_row[col].values[0]
             try:
                 records.append({'date': date_str, 'value': float(value)})
-            except:
+            except (ValueError, TypeError):
                 pass
 
     result = pd.DataFrame(records)
@@ -276,9 +281,12 @@ def main():
 
     print(f"\n{'Indicator':<20} {'Records':<10} {'Date Range'}")
     print("-" * 60)
-    print(f"{'Unemployment':<20} {len(unemployment_df):<10} {unemployment_df['date'].min()} to {unemployment_df['date'].max()}")
-    print(f"{'GDP':<20} {len(gdp_df):<10} {gdp_df['date'].min()} to {gdp_df['date'].max()}")
-    print(f"{'CPI':<20} {len(cpi_df):<10} {cpi_df['date'].min()} to {cpi_df['date'].max()}")
+    if not unemployment_df.empty:
+        print(f"{'Unemployment':<20} {len(unemployment_df):<10} {unemployment_df['date'].min()} to {unemployment_df['date'].max()}")
+    if not gdp_df.empty:
+        print(f"{'GDP':<20} {len(gdp_df):<10} {gdp_df['date'].min()} to {gdp_df['date'].max()}")
+    if not cpi_df.empty:
+        print(f"{'CPI':<20} {len(cpi_df):<10} {cpi_df['date'].min()} to {cpi_df['date'].max()}")
     if not wage_df.empty:
         print(f"{'Wage':<20} {len(wage_df):<10} {wage_df['date'].min()} to {wage_df['date'].max()}")
 
